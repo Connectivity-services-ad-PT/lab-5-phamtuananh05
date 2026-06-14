@@ -1,0 +1,1106 @@
+openapi: 3.1.0
+info:
+  title: Smart Campus — Access Gate Service
+  version: 1.0.0
+  description: |
+    Hợp đồng REST API cho Pair 03 — Core Business → Access Gate trong hệ thống
+    Smart Campus Operations Platform.
+
+    Access Gate Service đóng vai trò Provider. Core Business Service đóng vai trò
+    Consumer và gọi các API này để truy xuất log quẹt thẻ, trạng thái gate và
+    thông tin card phục vụ kiểm tra/audit.
+
+    Hợp đồng được viết theo nguyên tắc contract-first của Lab 02.
+  contact:
+    name: Nhóm 3 - Access Gate
+    email: phamdinhtuananh005@gmail.com
+
+servers:
+  - url: http://localhost:8000
+    description: Local Docker Compose Access Gate API
+  - url: http://localhost:4010
+    description: Prism mock server
+
+tags:
+  - name: health
+    description: Kiểm tra trạng thái hoạt động của Access Gate Service
+  - name: access-logs
+    description: Truy xuất lịch sử quẹt thẻ và ra/vào cổng
+  - name: gates
+    description: Truy xuất trạng thái cổng kiểm soát ra/vào
+  - name: cards
+    description: Truy xuất thông tin thẻ ra/vào
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      operationId: getAccessGateHealth
+      summary: Kiểm tra trạng thái Access Gate Service
+      description: |
+        Endpoint dùng để kiểm tra Access Gate Service còn hoạt động hay không.
+        Endpoint này không yêu cầu Bearer token để thuận tiện cho health check.
+      tags: [health]
+      security: []
+      responses:
+        '200':
+          description: Service đang hoạt động
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    service: access-gate
+                    time: '2026-05-10T08:00:00Z'
+
+  /access/logs/recent:
+    get:
+      operationId: getRecentAccessLogs
+      summary: Lấy danh sách access log gần đây
+      description: |
+        Core Business Service gọi endpoint này để lấy các log quẹt thẻ gần đây
+        từ Access Gate Service phục vụ kiểm tra/audit.
+
+        Consumer có thể lọc theo gateId, cardId, direction, status và khoảng
+        thời gian. Endpoint hỗ trợ cursor-based pagination.
+      tags: [access-logs]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/GateIdQuery'
+        - $ref: '#/components/parameters/CardIdQuery'
+        - $ref: '#/components/parameters/DirectionQuery'
+        - $ref: '#/components/parameters/AccessStatusQuery'
+        - $ref: '#/components/parameters/FromTime'
+        - $ref: '#/components/parameters/ToTime'
+      responses:
+        '200':
+          description: Danh sách access log gần đây
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessLogPage'
+              examples:
+                firstPage:
+                  value:
+                    items:
+                      - logType: GRANTED
+                        logId: log-001
+                        cardId: card-001
+                        gateId: gate-main
+                        direction: IN
+                        timestamp: '2026-05-10T08:00:00Z'
+                        status: GRANTED
+                        personId: SV001
+                        operatorNote: null
+                        grantedBy: access-policy
+                        accessMode: RFID
+                      - logType: DENIED
+                        logId: log-002
+                        cardId: card-009
+                        gateId: gate-main
+                        direction: OUT
+                        timestamp: '2026-05-10T08:05:00Z'
+                        status: DENIED
+                        personId: null
+                        operatorNote: Thẻ đang bị khóa
+                        deniedReason: CARD_BLOCKED
+                        accessMode: RFID
+                    nextCursor: null
+                    hasMore: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /access/logs/{logId}:
+    get:
+      operationId: getAccessLogById
+      summary: Lấy chi tiết một access log
+      description: |
+        Core Business Service gọi endpoint này để lấy chi tiết một log quẹt thẻ
+        hoặc một lần ra/vào cổng theo logId.
+
+        Endpoint trả về một trong các dạng log: GRANTED, DENIED hoặc ERROR.
+        Các dạng log được mô tả bằng oneOf và discriminator.
+      tags: [access-logs]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/LogId'
+      responses:
+        '200':
+          description: Chi tiết access log
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessLog'
+              examples:
+                granted:
+                  value:
+                    logType: GRANTED
+                    logId: log-001
+                    cardId: card-001
+                    gateId: gate-main
+                    direction: IN
+                    timestamp: '2026-05-10T08:00:00Z'
+                    status: GRANTED
+                    personId: SV001
+                    operatorNote: null
+                    grantedBy: access-policy
+                    accessMode: RFID
+                denied:
+                  value:
+                    logType: DENIED
+                    logId: log-002
+                    cardId: card-009
+                    gateId: gate-main
+                    direction: OUT
+                    timestamp: '2026-05-10T08:05:00Z'
+                    status: DENIED
+                    personId: null
+                    operatorNote: Thẻ đang bị khóa
+                    deniedReason: CARD_BLOCKED
+                    accessMode: RFID
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /gates:
+    get:
+      operationId: listGateStatuses
+      summary: Lấy danh sách trạng thái gate
+      description: |
+        Core Business Service gọi endpoint này để lấy danh sách trạng thái
+        các gate hiện có trong Access Gate Service.
+
+        Endpoint hỗ trợ cursor-based pagination để phục vụ yêu cầu phân trang
+        của Lab 02.
+      tags: [gates]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Danh sách trạng thái gate
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GateStatusPage'
+              examples:
+                gates:
+                  value:
+                    items:
+                      - gateId: gate-main
+                        gateName: Cổng chính
+                        status: ONLINE
+                        currentMode: TWO_WAY
+                        lastUpdatedAt: '2026-05-10T08:00:00Z'
+                        reason: null
+                      - gateId: gate-parking
+                        gateName: Cổng nhà xe
+                        status: MAINTENANCE
+                        currentMode: ENTRY_ONLY
+                        lastUpdatedAt: '2026-05-10T08:10:00Z'
+                        reason: Đang bảo trì barrier chiều ra
+                    nextCursor: null
+                    hasMore: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /gates/{gateId}/status:
+    get:
+      operationId: getGateStatus
+      summary: Lấy trạng thái hiện tại của một gate
+      description: |
+        Core Business Service gọi endpoint này để kiểm tra trạng thái hiện tại
+        của một gate cụ thể, ví dụ gate đang online, offline, đang bảo trì hoặc
+        bị lỗi thiết bị.
+      tags: [gates]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/GateId'
+      responses:
+        '200':
+          description: Trạng thái hiện tại của gate
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GateStatus'
+              examples:
+                online:
+                  value:
+                    gateId: gate-main
+                    gateName: Cổng chính
+                    status: ONLINE
+                    currentMode: TWO_WAY
+                    lastUpdatedAt: '2026-05-10T08:00:00Z'
+                    reason: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /cards/{cardId}:
+    get:
+      operationId: getCardById
+      summary: Lấy thông tin một card
+      description: |
+        Core Business Service gọi endpoint này để truy xuất thông tin card
+        từ Access Gate Service. Dữ liệu được dùng để kiểm tra/audit trạng thái
+        thẻ khi có sự kiện quẹt thẻ hoặc nghi vấn truy cập.
+      tags: [cards]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/CardId'
+      responses:
+        '200':
+          description: Thông tin card
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardInfo'
+              examples:
+                activeCard:
+                  value:
+                    cardId: card-001
+                    cardCode: RFID-2026-001
+                    cardType: RFID
+                    status: ACTIVE
+                    issuedTo: SV001
+                    validFrom: '2026-01-01'
+                    validTo: '2026-12-31'
+                    lastUsedAt: '2026-05-10T08:00:00Z'
+                    note: null
+                blockedCard:
+                  value:
+                    cardId: card-009
+                    cardCode: RFID-2026-009
+                    cardType: RFID
+                    status: BLOCKED
+                    issuedTo: SV009
+                    validFrom: '2026-01-01'
+                    validTo: '2026-12-31'
+                    lastUsedAt: '2026-05-09T17:30:00Z'
+                    note: Thẻ bị khóa do báo mất
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+webhooks:
+  accessLogCreated:
+    post:
+      operationId: onAccessLogCreated
+      summary: Webhook khi Access Gate tạo access log mới
+      description: |
+        Webhook mô tả sự kiện Access Gate phát ra khi có một log ra/vào mới.
+        Phần này dùng để đáp ứng yêu cầu bài tập về nhà Lab 02 về webhook.
+      tags: [access-logs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessLog'
+            examples:
+              grantedLog:
+                value:
+                  logType: GRANTED
+                  logId: log-001
+                  cardId: card-001
+                  gateId: gate-main
+                  direction: IN
+                  timestamp: '2026-05-10T08:00:00Z'
+                  status: GRANTED
+                  personId: SV001
+                  operatorNote: null
+                  grantedBy: access-policy
+                  accessMode: RFID
+      responses:
+        '200':
+          description: Consumer đã nhận webhook
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  headers:
+    CorrelationId:
+      description: Correlation id được trả lại để đối chiếu log giữa Core Business và Access Gate.
+      schema:
+        type: string
+        format: uuid
+        example: 11111111-1111-1111-1111-111111111111
+
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: true
+      description: |
+        Mã correlation id do Consumer gửi để trace request giữa các service.
+      schema:
+        type: string
+        format: uuid
+        example: 11111111-1111-1111-1111-111111111111
+
+    LogId:
+      name: logId
+      in: path
+      required: true
+      description: Mã định danh access log.
+      schema:
+        type: string
+        minLength: 5
+        maxLength: 80
+        pattern: '^log-[a-zA-Z0-9-]{3,64}$'
+        example: log-001
+
+    GateId:
+      name: gateId
+      in: path
+      required: true
+      description: Mã định danh gate.
+      schema:
+        type: string
+        minLength: 6
+        maxLength: 50
+        pattern: '^gate-[a-z0-9-]{2,40}$'
+        example: gate-main
+
+    CardId:
+      name: cardId
+      in: path
+      required: true
+      description: Mã định danh card trong Access Gate Service.
+      schema:
+        type: string
+        minLength: 6
+        maxLength: 80
+        pattern: '^card-[a-zA-Z0-9-]{3,64}$'
+        example: card-001
+
+    GateIdQuery:
+      name: gateId
+      in: query
+      required: false
+      description: Lọc log theo gateId.
+      schema:
+        type: string
+        minLength: 6
+        maxLength: 50
+        pattern: '^gate-[a-z0-9-]{2,40}$'
+        example: gate-main
+
+    CardIdQuery:
+      name: cardId
+      in: query
+      required: false
+      description: Lọc log theo cardId.
+      schema:
+        type: string
+        minLength: 6
+        maxLength: 80
+        pattern: '^card-[a-zA-Z0-9-]{3,64}$'
+        example: card-001
+
+    DirectionQuery:
+      name: direction
+      in: query
+      required: false
+      description: Lọc log theo hướng ra/vào.
+      schema:
+        $ref: '#/components/schemas/AccessDirection'
+
+    AccessStatusQuery:
+      name: status
+      in: query
+      required: false
+      description: Lọc log theo trạng thái truy cập.
+      schema:
+        $ref: '#/components/schemas/AccessStatus'
+
+    FromTime:
+      name: from
+      in: query
+      required: false
+      description: Thời điểm bắt đầu khoảng thời gian cần truy vấn.
+      schema:
+        type: string
+        format: date-time
+        example: '2026-05-10T00:00:00Z'
+
+    ToTime:
+      name: to
+      in: query
+      required: false
+      description: Thời điểm kết thúc khoảng thời gian cần truy vấn.
+      schema:
+        type: string
+        format: date-time
+        example: '2026-05-10T23:59:59Z'
+
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Cursor dùng để lấy trang tiếp theo.
+      schema:
+        type: [string, 'null']
+        minLength: 1
+        maxLength: 200
+        example: null
+
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Số item tối đa mỗi trang.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+        example: 20
+
+  schemas:
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required: [status, service, time]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          description: Trạng thái service.
+          example: ok
+        service:
+          type: string
+          minLength: 2
+          maxLength: 80
+          description: Tên service.
+          example: access-gate
+        time:
+          type: string
+          format: date-time
+          description: Thời điểm kiểm tra service.
+          example: '2026-05-10T08:00:00Z'
+
+    AccessLog:
+      oneOf:
+        - $ref: '#/components/schemas/GrantedAccessLog'
+        - $ref: '#/components/schemas/DeniedAccessLog'
+        - $ref: '#/components/schemas/ErrorAccessLog'
+      discriminator:
+        propertyName: logType
+        mapping:
+          GRANTED: '#/components/schemas/GrantedAccessLog'
+          DENIED: '#/components/schemas/DeniedAccessLog'
+          ERROR: '#/components/schemas/ErrorAccessLog'
+
+    GrantedAccessLog:
+      type: object
+      additionalProperties: false
+      required:
+        - logType
+        - logId
+        - cardId
+        - gateId
+        - direction
+        - timestamp
+        - status
+        - personId
+        - operatorNote
+        - grantedBy
+        - accessMode
+      properties:
+        logType:
+          type: string
+          const: GRANTED
+          description: Loại log dùng cho discriminator.
+          example: GRANTED
+        logId:
+          type: string
+          minLength: 5
+          maxLength: 80
+          pattern: '^log-[a-zA-Z0-9-]{3,64}$'
+          example: log-001
+        cardId:
+          type: string
+          minLength: 6
+          maxLength: 80
+          pattern: '^card-[a-zA-Z0-9-]{3,64}$'
+          example: card-001
+        gateId:
+          type: string
+          minLength: 6
+          maxLength: 50
+          pattern: '^gate-[a-z0-9-]{2,40}$'
+          example: gate-main
+        direction:
+          $ref: '#/components/schemas/AccessDirection'
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-05-10T08:00:00Z'
+        status:
+          type: string
+          const: GRANTED
+          example: GRANTED
+        personId:
+          type: [string, 'null']
+          minLength: 2
+          maxLength: 80
+          pattern: '^[A-Za-z0-9-]{2,80}$'
+          description: Mã người dùng nếu xác định được.
+          example: SV001
+        operatorNote:
+          type: [string, 'null']
+          maxLength: 500
+          description: Ghi chú của nhân viên vận hành, có thể null.
+          example: null
+        grantedBy:
+          type: string
+          enum: [access-policy, manual-override]
+          description: Nguồn quyết định cho phép truy cập.
+          example: access-policy
+        accessMode:
+          $ref: '#/components/schemas/AccessMode'
+
+    DeniedAccessLog:
+      type: object
+      additionalProperties: false
+      required:
+        - logType
+        - logId
+        - cardId
+        - gateId
+        - direction
+        - timestamp
+        - status
+        - personId
+        - operatorNote
+        - deniedReason
+        - accessMode
+      properties:
+        logType:
+          type: string
+          const: DENIED
+          description: Loại log dùng cho discriminator.
+          example: DENIED
+        logId:
+          type: string
+          minLength: 5
+          maxLength: 80
+          pattern: '^log-[a-zA-Z0-9-]{3,64}$'
+          example: log-002
+        cardId:
+          type: string
+          minLength: 6
+          maxLength: 80
+          pattern: '^card-[a-zA-Z0-9-]{3,64}$'
+          example: card-009
+        gateId:
+          type: string
+          minLength: 6
+          maxLength: 50
+          pattern: '^gate-[a-z0-9-]{2,40}$'
+          example: gate-main
+        direction:
+          $ref: '#/components/schemas/AccessDirection'
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-05-10T08:05:00Z'
+        status:
+          type: string
+          const: DENIED
+          example: DENIED
+        personId:
+          type: [string, 'null']
+          minLength: 2
+          maxLength: 80
+          pattern: '^[A-Za-z0-9-]{2,80}$'
+          description: Mã người dùng nếu xác định được, null nếu không xác định.
+          example: null
+        operatorNote:
+          type: [string, 'null']
+          maxLength: 500
+          description: Ghi chú vận hành, có thể null.
+          example: Thẻ đang bị khóa
+        deniedReason:
+          type: string
+          enum:
+            - CARD_BLOCKED
+            - CARD_EXPIRED
+            - GATE_OFFLINE
+            - POLICY_DENIED
+            - UNKNOWN_CARD
+          description: Lý do từ chối truy cập.
+          example: CARD_BLOCKED
+        accessMode:
+          $ref: '#/components/schemas/AccessMode'
+
+    ErrorAccessLog:
+      type: object
+      additionalProperties: false
+      required:
+        - logType
+        - logId
+        - cardId
+        - gateId
+        - direction
+        - timestamp
+        - status
+        - personId
+        - operatorNote
+        - errorCode
+        - accessMode
+      properties:
+        logType:
+          type: string
+          const: ERROR
+          description: Loại log dùng cho discriminator.
+          example: ERROR
+        logId:
+          type: string
+          minLength: 5
+          maxLength: 80
+          pattern: '^log-[a-zA-Z0-9-]{3,64}$'
+          example: log-003
+        cardId:
+          type: string
+          minLength: 6
+          maxLength: 80
+          pattern: '^card-[a-zA-Z0-9-]{3,64}$'
+          example: card-003
+        gateId:
+          type: string
+          minLength: 6
+          maxLength: 50
+          pattern: '^gate-[a-z0-9-]{2,40}$'
+          example: gate-main
+        direction:
+          $ref: '#/components/schemas/AccessDirection'
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-05-10T08:07:00Z'
+        status:
+          type: string
+          const: ERROR
+          example: ERROR
+        personId:
+          type: [string, 'null']
+          minLength: 2
+          maxLength: 80
+          pattern: '^[A-Za-z0-9-]{2,80}$'
+          example: null
+        operatorNote:
+          type: [string, 'null']
+          maxLength: 500
+          example: Lỗi đọc tín hiệu từ đầu đọc thẻ
+        errorCode:
+          type: string
+          enum:
+            - DEVICE_TIMEOUT
+            - READER_ERROR
+            - DOWNSTREAM_TIMEOUT
+            - UNKNOWN_ERROR
+          description: Mã lỗi kỹ thuật khi ghi nhận access log.
+          example: DEVICE_TIMEOUT
+        accessMode:
+          $ref: '#/components/schemas/AccessMode'
+
+    AccessLogPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, hasMore]
+      properties:
+        items:
+          type: array
+          minItems: 0
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/AccessLog'
+        nextCursor:
+          type: [string, 'null']
+          maxLength: 200
+          description: Cursor trang tiếp theo, null nếu hết dữ liệu.
+          example: null
+        hasMore:
+          type: boolean
+          description: Còn dữ liệu ở trang tiếp theo hay không.
+          example: false
+
+    GateStatus:
+      type: object
+      additionalProperties: false
+      required: [gateId, gateName, status, currentMode, lastUpdatedAt, reason]
+      properties:
+        gateId:
+          type: string
+          minLength: 6
+          maxLength: 50
+          pattern: '^gate-[a-z0-9-]{2,40}$'
+          example: gate-main
+        gateName:
+          type: string
+          minLength: 2
+          maxLength: 120
+          example: Cổng chính
+        status:
+          $ref: '#/components/schemas/GateOperationalStatus'
+        currentMode:
+          type: string
+          enum: [ENTRY_ONLY, EXIT_ONLY, TWO_WAY, CLOSED]
+          description: Chế độ hoạt động hiện tại của gate.
+          example: TWO_WAY
+        lastUpdatedAt:
+          type: string
+          format: date-time
+          example: '2026-05-10T08:00:00Z'
+        reason:
+          type: [string, 'null']
+          maxLength: 500
+          description: Lý do trạng thái hiện tại, null nếu không có.
+          example: null
+
+    GateStatusPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, hasMore]
+      properties:
+        items:
+          type: array
+          minItems: 0
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/GateStatus'
+        nextCursor:
+          type: [string, 'null']
+          maxLength: 200
+          example: null
+        hasMore:
+          type: boolean
+          example: false
+
+    CardInfo:
+      type: object
+      additionalProperties: false
+      required:
+        - cardId
+        - cardCode
+        - cardType
+        - status
+        - issuedTo
+        - validFrom
+        - validTo
+        - lastUsedAt
+        - note
+      properties:
+        cardId:
+          type: string
+          minLength: 6
+          maxLength: 80
+          pattern: '^card-[a-zA-Z0-9-]{3,64}$'
+          example: card-001
+        cardCode:
+          type: string
+          minLength: 5
+          maxLength: 80
+          pattern: '^RFID-[0-9]{4}-[0-9]{3}$'
+          description: Mã vật lý hoặc mã định danh của thẻ.
+          example: RFID-2026-001
+        cardType:
+          type: string
+          enum: [RFID, QR, NFC]
+          description: Loại card hoặc credential.
+          example: RFID
+        status:
+          $ref: '#/components/schemas/CardStatus'
+        issuedTo:
+          type: [string, 'null']
+          minLength: 2
+          maxLength: 80
+          pattern: '^[A-Za-z0-9-]{2,80}$'
+          description: Mã người được cấp thẻ, null nếu thẻ chưa gán.
+          example: SV001
+        validFrom:
+          type: string
+          format: date
+          example: '2026-01-01'
+        validTo:
+          type: string
+          format: date
+          example: '2026-12-31'
+        lastUsedAt:
+          type: [string, 'null']
+          format: date-time
+          description: Lần cuối thẻ được sử dụng, null nếu chưa dùng.
+          example: '2026-05-10T08:00:00Z'
+        note:
+          type: [string, 'null']
+          maxLength: 500
+          description: Ghi chú về card.
+          example: null
+
+    AccessDirection:
+      type: string
+      enum: [IN, OUT]
+      description: Hướng di chuyển qua gate.
+      example: IN
+
+    AccessStatus:
+      type: string
+      enum: [GRANTED, DENIED, ERROR]
+      description: Trạng thái xử lý truy cập.
+      example: GRANTED
+
+    AccessMode:
+      type: string
+      enum: [RFID, QR, FACE_ID, LICENSE_PLATE, MANUAL]
+      description: Phương thức định danh khi ra/vào.
+      example: RFID
+
+    GateOperationalStatus:
+      type: string
+      enum: [ONLINE, OFFLINE, MAINTENANCE, DEGRADED]
+      description: Trạng thái vận hành của gate.
+      example: ONLINE
+
+    CardStatus:
+      type: string
+      enum: [ACTIVE, BLOCKED, EXPIRED, LOST, UNKNOWN]
+      description: Trạng thái nghiệp vụ của card.
+      example: ACTIVE
+
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI định danh loại lỗi.
+          example: https://campus.local/errors/validation
+        title:
+          type: string
+          minLength: 3
+          maxLength: 120
+          description: Tiêu đề lỗi ngắn gọn.
+          example: Dữ liệu không hợp lệ
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+          description: HTTP status code.
+          example: 400
+        detail:
+          type: [string, 'null']
+          maxLength: 500
+          description: Mô tả chi tiết lỗi.
+          example: Field cardId không đúng định dạng
+        instance:
+          type: [string, 'null']
+          format: uri
+          description: URI của request gây lỗi.
+          example: /cards/card-001
+        correlationId:
+          type: [string, 'null']
+          format: uuid
+          description: Correlation id của request lỗi.
+          example: 11111111-1111-1111-1111-111111111111
+        errors:
+          type: array
+          minItems: 0
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [field, code, message]
+            properties:
+              field:
+                type: string
+                minLength: 1
+                maxLength: 80
+                example: cardId
+              code:
+                type: string
+                minLength: 2
+                maxLength: 80
+                example: PATTERN_MISMATCH
+              message:
+                type: string
+                minLength: 3
+                maxLength: 200
+                example: cardId phải có dạng card-xxx
+
+  responses:
+    BadRequest:
+      description: Request sai định dạng hoặc query/path parameter không hợp lệ
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/validation
+            title: Dữ liệu không hợp lệ
+            status: 400
+            detail: Query parameter limit phải nằm trong khoảng 1 đến 100
+            instance: /access/logs/recent
+            correlationId: 11111111-1111-1111-1111-111111111111
+            errors:
+              - field: limit
+                code: RANGE_ERROR
+                message: limit phải nằm trong khoảng 1 đến 100
+
+    Unauthorized:
+      description: Thiếu hoặc sai Bearer token
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/unauthorized
+            title: Chưa xác thực
+            status: 401
+            detail: Thiếu Bearer token
+            instance: /access/logs/recent
+            correlationId: 11111111-1111-1111-1111-111111111111
+            errors: []
+
+    Forbidden:
+      description: Token hợp lệ nhưng Consumer không có quyền truy cập resource
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/forbidden
+            title: Không có quyền truy cập
+            status: 403
+            detail: Consumer không có quyền xem thông tin card
+            instance: /cards/card-001
+            correlationId: 11111111-1111-1111-1111-111111111111
+            errors: []
+
+    NotFound:
+      description: Resource không tồn tại
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/not-found
+            title: Không tìm thấy resource
+            status: 404
+            detail: Không tìm thấy access log theo logId
+            instance: /access/logs/log-999
+            correlationId: 11111111-1111-1111-1111-111111111111
+            errors: []
+
+    Conflict:
+      description: Xung đột nghiệp vụ hoặc retry gây trùng request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/conflict
+            title: Xung đột nghiệp vụ
+            status: 409
+            detail: Request bị trùng correlation id trong thời gian ngắn
+            instance: /access/logs/recent
+            correlationId: 11111111-1111-1111-1111-111111111111
+            errors: []
+
+    UnprocessableEntity:
+      description: Request đúng định dạng nhưng vi phạm rule nghiệp vụ
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/business-rule
+            title: Vi phạm rule nghiệp vụ
+            status: 422
+            detail: Thời gian from không được lớn hơn thời gian to
+            instance: /access/logs/recent
+            correlationId: 11111111-1111-1111-1111-111111111111
+            errors:
+              - field: from
+                code: INVALID_TIME_RANGE
+                message: from phải nhỏ hơn hoặc bằng to
+
+    InternalServerError:
+      description: Lỗi không mong muốn phía Access Gate Service
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/internal
+            title: Lỗi hệ thống
+            status: 500
+            detail: Access Gate Service gặp lỗi không mong muốn
+            instance: /gates/gate-main/status
+            correlationId: 11111111-1111-1111-1111-111111111111
+            errors: []

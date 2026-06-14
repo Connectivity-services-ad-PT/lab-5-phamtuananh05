@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="FIT4110 Lab05 - Team Gate - Access Gate Compose" tests="13" time="0.164">
+  <testsuite name="01_Compose_Health / 01 API health returns database ok" id="22b2988c-6415-48ae-88c6-b457e610e5c7" timestamp="2026-06-14T15:42:54.314Z" tests="4" failures="0" errors="0" time="0.035">
+    <testcase name="API health returns 200" time="0.035" classname="01ComposeHealth01ApiHealthReturnsDatabaseOk"/>
+    <testcase name="API status is ok" time="0.035" classname="01ComposeHealth01ApiHealthReturnsDatabaseOk"/>
+    <testcase name="Service is access-gate" time="0.035" classname="01ComposeHealth01ApiHealthReturnsDatabaseOk"/>
+    <testcase name="Database status is ok when required" time="0.035" classname="01ComposeHealth01ApiHealthReturnsDatabaseOk"/>
+  </testsuite>
+  <testsuite name="01_Compose_Health / 02 AI service health returns ok" id="8e198b2b-fc92-411f-9b9d-6ff45be7e0c8" timestamp="2026-06-14T15:42:54.314Z" tests="3" failures="0" errors="0" time="0.012">
+    <testcase name="AI service health returns 200" time="0.012" classname="01ComposeHealth02AiServiceHealthReturnsOk"/>
+    <testcase name="AI service status is ok" time="0.012" classname="01ComposeHealth02AiServiceHealthReturnsOk"/>
+    <testcase name="AI service has service name" time="0.012" classname="01ComposeHealth02AiServiceHealthReturnsOk"/>
+  </testsuite>
+  <testsuite name="02_Access_Gate_Functional / 03 Get recent access logs" id="45540317-30db-4f30-88e9-01e7f3d65aa7" timestamp="2026-06-14T15:42:54.314Z" tests="3" failures="0" errors="0" time="0.019">
+    <testcase name="Recent logs returns 200" time="0.019" classname="02AccessGateFunctional03GetRecentAccessLogs"/>
+    <testcase name="Recent logs has items array" time="0.019" classname="02AccessGateFunctional03GetRecentAccessLogs"/>
+    <testcase name="Recent logs has pagination fields" time="0.019" classname="02AccessGateFunctional03GetRecentAccessLogs"/>
+  </testsuite>
+  <testsuite name="02_Access_Gate_Functional / 04 Get access log detail" id="35836778-164c-4c4d-b80b-a08a73cd5997" timestamp="2026-06-14T15:42:54.314Z" tests="2" failures="0" errors="0" time="0.017">
+    <testcase name="Log detail returns 200" time="0.017" classname="02AccessGateFunctional04GetAccessLogDetail"/>
+    <testcase name="Log id matches" time="0.017" classname="02AccessGateFunctional04GetAccessLogDetail"/>
+  </testsuite>
+  <testsuite name="02_Access_Gate_Functional / 05 Get gate status" id="e017a539-e8b8-4f3e-8c4a-037846a5f9ed" timestamp="2026-06-14T15:42:54.314Z" tests="2" failures="0" errors="0" time="0.017">
+    <testcase name="Gate status returns 200" time="0.017" classname="02AccessGateFunctional05GetGateStatus"/>
+    <testcase name="Gate id matches" time="0.017" classname="02AccessGateFunctional05GetGateStatus"/>
+  </testsuite>
+  <testsuite name="02_Access_Gate_Functional / 06 Get card info" id="5bf58e54-87ca-46c8-9c6d-a154c3b41e35" timestamp="2026-06-14T15:42:54.314Z" tests="3" failures="0" errors="0" time="0.016">
+    <testcase name="Card info returns 200" time="0.016" classname="02AccessGateFunctional06GetCardInfo"/>
+    <testcase name="Card id matches" time="0.016" classname="02AccessGateFunctional06GetCardInfo"/>
+    <testcase name="Card status exists" time="0.016" classname="02AccessGateFunctional06GetCardInfo"/>
+  </testsuite>
+  <testsuite name="03_Auth_And_Negative / 07 Missing token returns 401" id="27ef8ee4-fd49-4dae-a3a9-5414ee8c6db9" timestamp="2026-06-14T15:42:54.314Z" tests="2" failures="0" errors="0" time="0.004">
+    <testcase name="Missing token returns 401" time="0.004" classname="03AuthAndNegative07MissingTokenReturns401"/>
+    <testcase name="Error response has ProblemDetails shape" time="0.004" classname="03AuthAndNegative07MissingTokenReturns401"/>
+  </testsuite>
+  <testsuite name="03_Auth_And_Negative / 08 Invalid limit returns 422" id="7aa18900-e635-47bc-a8e9-0ca7ce0eeb86" timestamp="2026-06-14T15:42:54.314Z" tests="2" failures="0" errors="0" time="0.003">
+    <testcase name="Invalid limit returns 422" time="0.003" classname="03AuthAndNegative08InvalidLimitReturns422"/>
+    <testcase name="Validation error has status 422" time="0.003" classname="03AuthAndNegative08InvalidLimitReturns422"/>
+  </testsuite>
+  <testsuite name="03_Auth_And_Negative / 09 Unknown card returns 404" id="d301b2d2-de5f-48a8-8312-6374dcb6fd2f" timestamp="2026-06-14T15:42:54.314Z" tests="2" failures="0" errors="0" time="0.016">
+    <testcase name="Unknown card returns 404" time="0.016" classname="03AuthAndNegative09UnknownCardReturns404"/>
+    <testcase name="Not found has ProblemDetails shape" time="0.016" classname="03AuthAndNegative09UnknownCardReturns404"/>
+  </testsuite>
+  <testsuite name="04_AI_Risk_Service / 10 AI predict active card low risk" id="7dd041d6-665c-40d0-bb1d-eef84c9f4eb0" timestamp="2026-06-14T15:42:54.314Z" tests="3" failures="0" errors="0" time="0.005">
+    <testcase name="AI predict returns 200" time="0.005" classname="04AiRiskService10AiPredictActiveCardLowRisk"/>
+    <testcase name="Active card has LOW risk" time="0.005" classname="04AiRiskService10AiPredictActiveCardLowRisk"/>
+    <testcase name="AI response has modelVersion" time="0.005" classname="04AiRiskService10AiPredictActiveCardLowRisk"/>
+  </testsuite>
+  <testsuite name="04_AI_Risk_Service / 11 AI predict blocked card high risk" id="059fe58d-1f74-4a29-8f3b-90231b961603" timestamp="2026-06-14T15:42:54.314Z" tests="3" failures="0" errors="0" time="0.005">
+    <testcase name="AI predict returns 200" time="0.005" classname="04AiRiskService11AiPredictBlockedCardHighRisk"/>
+    <testcase name="Blocked card has HIGH risk" time="0.005" classname="04AiRiskService11AiPredictBlockedCardHighRisk"/>
+    <testcase name="Blocked card recommendation is DENY" time="0.005" classname="04AiRiskService11AiPredictBlockedCardHighRisk"/>
+  </testsuite>
+  <testsuite name="05_Reliability / 12 API health response time under 1000ms" id="afed9e3b-c99a-4ef6-87d7-7ad0de759960" timestamp="2026-06-14T15:42:54.314Z" tests="2" failures="0" errors="0" time="0.010">
+    <testcase name="API health returns 200" time="0.010" classname="05Reliability12ApiHealthResponseTimeUnder1000Ms"/>
+    <testcase name="API health response time is under 1000ms" time="0.010" classname="05Reliability12ApiHealthResponseTimeUnder1000Ms"/>
+  </testsuite>
+  <testsuite name="05_Reliability / 13 AI health response time under 1000ms" id="7a046e92-2e7e-4382-a27e-5aec2b5f205b" timestamp="2026-06-14T15:42:54.314Z" tests="2" failures="0" errors="0" time="0.005">
+    <testcase name="AI health returns 200" time="0.005" classname="05Reliability13AiHealthResponseTimeUnder1000Ms"/>
+    <testcase name="AI health response time is under 1000ms" time="0.005" classname="05Reliability13AiHealthResponseTimeUnder1000Ms"/>
+  </testsuite>
+</testsuites>

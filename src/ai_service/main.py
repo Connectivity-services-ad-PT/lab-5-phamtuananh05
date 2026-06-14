@@ -1,44 +1,99 @@
-"""
-Simple AI service mock for Lab 05.
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from datetime import datetime, timezone
+import json
 
-This service exposes two endpoints:
 
-* `GET /health` – returns status, service name and version.
-* `POST /predict` – returns a dummy list of detected objects and confidences.
-
-You can replace this file with your actual inference code (e.g. YOLOv8 model).
-"""
-
-from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import List
-
-SERVICE_NAME = "ai-service"
+SERVICE_NAME = "access-gate-ai-service"
 SERVICE_VERSION = "0.5.0"
 
-app = FastAPI(
-    title="FIT4110 Lab 05 - AI Service",
-    version=SERVICE_VERSION,
-    description="Mock AI service used in Docker Compose stack.",
-)
 
+class Handler(BaseHTTPRequestHandler):
+    def _send_json(self, status_code: int, payload: dict) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
-class Prediction(BaseModel):
-    objects: List[str]
-    confidence: List[float]
+    def do_GET(self) -> None:
+        if self.path == "/health":
+            self._send_json(
+                200,
+                {
+                    "status": "ok",
+                    "service": SERVICE_NAME,
+                    "version": SERVICE_VERSION,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+            return
 
+        self._send_json(
+            404,
+            {
+                "type": "https://campus.local/errors/not-found",
+                "title": "Not Found",
+                "status": 404,
+                "detail": "Endpoint not found",
+            },
+        )
 
-@app.get("/health")
-def health() -> dict:
-    return {"status": "ok", "service": SERVICE_NAME, "version": SERVICE_VERSION}
+    def do_POST(self) -> None:
+        if self.path == "/predict":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length).decode("utf-8") if content_length else "{}"
 
+            try:
+                request_body = json.loads(raw_body)
+            except json.JSONDecodeError:
+                request_body = {}
 
-@app.post("/predict", response_model=Prediction)
-def predict() -> Prediction:
-    # This dummy implementation always returns two objects
-    return Prediction(objects=["person", "bicycle"], confidence=[0.98, 0.85])
+            card_id = request_body.get("cardId", "unknown")
+            gate_id = request_body.get("gateId", "unknown")
+            direction = request_body.get("direction", "IN")
+
+            risk_level = "LOW"
+            recommendation = "ALLOW_REVIEW"
+            confidence = 0.91
+
+            if card_id in ["card-009", "blocked-card", "unknown"]:
+                risk_level = "HIGH"
+                recommendation = "DENY"
+                confidence = 0.97
+
+            self._send_json(
+                200,
+                {
+                    "service": SERVICE_NAME,
+                    "version": SERVICE_VERSION,
+                    "riskLevel": risk_level,
+                    "recommendation": recommendation,
+                    "confidence": confidence,
+                    "cardId": card_id,
+                    "gateId": gate_id,
+                    "direction": direction,
+                    "modelVersion": "mock-access-risk-v1",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+            return
+
+        self._send_json(
+            404,
+            {
+                "type": "https://campus.local/errors/not-found",
+                "title": "Not Found",
+                "status": 404,
+                "detail": "Endpoint not found",
+            },
+        )
+
+    def log_message(self, format: str, *args) -> None:
+        print("%s - - %s" % (self.address_string(), format % args))
 
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=9000)
+    server = HTTPServer(("0.0.0.0", 9000), Handler)
+    print(f"{SERVICE_NAME} running on port 9000")
+    server.serve_forever()

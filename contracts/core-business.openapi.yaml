@@ -1,0 +1,230 @@
+openapi: 3.1.0
+info:
+  title: Smart Campus — Core Business Policy Mock
+  version: 1.0.0
+  description: Mock contract for Core Business policy evaluation used by Access Gate consumer-side smoke test.
+
+servers:
+  - url: http://localhost:4011
+    description: Prism mock server for Core Business
+
+paths:
+  /health:
+    get:
+      operationId: getCoreBusinessHealth
+      summary: Check Core Business mock health
+      description: Health endpoint for Core Business mock.
+      tags: [health]
+      responses:
+        '200':
+          description: Core Business mock is running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    service: core-business
+                    time: '2026-05-10T08:00:00Z'
+
+  /policies/evaluate-access:
+    post:
+      operationId: evaluateAccessPolicy
+      summary: Evaluate access policy
+      description: Access Gate calls this endpoint to check whether a person/card is allowed to pass a gate.
+      tags: [policies]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluateAccessPolicyRequest'
+            examples:
+              allow:
+                value:
+                  personId: SV001
+                  cardId: card-001
+                  gateId: gate-main
+                  direction: IN
+                  timestamp: '2026-05-10T08:00:00Z'
+      responses:
+        '200':
+          description: Access policy evaluation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluateAccessPolicyResponse'
+              examples:
+                allowed:
+                  value:
+                    allowed: true
+                    decision: ALLOW
+                    reason: User has permission to access this gate
+                    policyId: policy-001
+                    evaluatedAt: '2026-05-10T08:00:01Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required: [status, service, time]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          example: ok
+        service:
+          type: string
+          example: core-business
+        time:
+          type: string
+          format: date-time
+          example: '2026-05-10T08:00:00Z'
+
+    EvaluateAccessPolicyRequest:
+      type: object
+      additionalProperties: false
+      required: [personId, cardId, gateId, direction, timestamp]
+      properties:
+        personId:
+          type: string
+          minLength: 2
+          maxLength: 80
+          example: SV001
+        cardId:
+          type: string
+          minLength: 6
+          maxLength: 80
+          pattern: '^card-[a-zA-Z0-9-]{3,64}$'
+          example: card-001
+        gateId:
+          type: string
+          minLength: 6
+          maxLength: 50
+          pattern: '^gate-[a-z0-9-]{2,40}$'
+          example: gate-main
+        direction:
+          type: string
+          enum: [IN, OUT]
+          example: IN
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-05-10T08:00:00Z'
+
+    EvaluateAccessPolicyResponse:
+      type: object
+      additionalProperties: false
+      required: [allowed, decision, reason, policyId, evaluatedAt]
+      properties:
+        allowed:
+          type: boolean
+          example: true
+        decision:
+          type: string
+          enum: [ALLOW, DENY]
+          example: ALLOW
+        reason:
+          type: string
+          example: User has permission to access this gate
+        policyId:
+          type: string
+          example: policy-001
+        evaluatedAt:
+          type: string
+          format: date-time
+          example: '2026-05-10T08:00:01Z'
+
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          example: https://campus.local/errors/validation
+        title:
+          type: string
+          example: Invalid request
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+          example: 400
+        detail:
+          type: [string, 'null']
+          example: Request body is invalid
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/validation
+            title: Bad request
+            status: 400
+            detail: Request body is invalid
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/unauthorized
+            title: Unauthorized
+            status: 401
+            detail: Missing or invalid token
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    UnprocessableEntity:
+      description: Business rule violation
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
